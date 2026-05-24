@@ -29,6 +29,85 @@
     }
     header h1 { font-size: 1.3rem; font-weight: 700; }
     header span { font-size: 1.6rem; }
+    .pro-badge {
+      margin-left: 10px; background: #f4a261; color: #3d1a00;
+      font-size: 0.65rem; font-weight: 900; padding: 3px 10px;
+      border-radius: 20px; letter-spacing: .06em; text-transform: uppercase;
+      display: none;
+    }
+    .pro-badge.visible { display: inline-block; }
+
+    /* ── Banner Pro en panel ── */
+    .pro-banner {
+      border-radius: 12px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.8rem; font-weight: 600;
+    }
+    .pro-banner.free {
+      background: #fff8e8; border: 1.5px solid #f4a261; color: #7a4500;
+    }
+    .pro-banner.activated {
+      background: #eaf5ef; border: 1.5px solid #2d6a4f; color: #1e4d38;
+      display: none;
+    }
+    .pro-banner.activated.visible { display: flex; }
+    .pro-banner.free.hidden { display: none; }
+    .btn-activar {
+      margin-left: auto; white-space: nowrap;
+      background: #f4a261; color: white; border: none;
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 800;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+    }
+    .btn-activar:hover { background: #e08940; }
+
+    /* ── Modal de activación ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 20px; padding: 36px 32px;
+      max-width: 420px; width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      text-align: center;
+    }
+    .modal h2 { font-size: 1.4rem; font-weight: 900; margin-bottom: 8px; color: #1a1a1a; }
+    .modal p  { font-size: 0.88rem; color: #666; line-height: 1.5; margin-bottom: 24px; }
+    .modal-features {
+      background: #eaf5ef; border-radius: 12px; padding: 14px 16px;
+      margin-bottom: 24px; text-align: left;
+    }
+    .modal-features li {
+      font-size: 0.83rem; color: #2d6a4f; font-weight: 600;
+      list-style: none; padding: 4px 0;
+    }
+    .modal-features li::before { content: '✓  '; font-weight: 900; }
+    .modal-input {
+      width: 100%; padding: 12px 16px;
+      border: 2px solid #ddd; border-radius: 10px;
+      font-size: 1rem; font-family: monospace; text-align: center;
+      letter-spacing: .08em; margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .modal-input:focus { outline: none; border-color: #2d6a4f; }
+    .modal-input.error { border-color: #e63946; }
+    .modal-error { color: #e63946; font-size: 0.8rem; margin-bottom: 12px; display: none; }
+    .btn-modal-activar {
+      width: 100%; padding: 13px; background: #2d6a4f; color: white;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 800;
+      cursor: pointer; font-family: inherit; transition: background 0.2s;
+      margin-bottom: 10px;
+    }
+    .btn-modal-activar:hover { background: #1e4d38; }
+    .btn-modal-cerrar {
+      background: none; border: none; color: #aaa; font-size: 0.82rem;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-modal-cerrar:hover { color: #555; }
 
     .app {
       display: flex;
@@ -359,12 +438,22 @@
 <header>
   <span>🛒</span>
   <h1>Generador de Carteles y Etiquetas</h1>
+  <span class="pro-badge" id="proBadge">⭐ PRO</span>
 </header>
 
 <div class="app">
 
   <!-- ── PANEL ── -->
   <div class="panel">
+
+    <!-- ── Banner Pro ── -->
+    <div class="pro-banner free" id="bannerFree">
+      🔒 Versión gratis · 5 productos · Con marca de agua
+      <button class="btn-activar" id="btnAbrirModal">Activar Pro →</button>
+    </div>
+    <div class="pro-banner activated" id="bannerPro">
+      ⭐ Versión Pro activada — Sin límites, sin marca de agua
+    </div>
 
     <!-- ── Catálogo guardado ── -->
     <details class="catalogo-section" id="catalogoSection" open>
@@ -861,7 +950,8 @@
         const { jsPDF } = window.jspdf;
         let pdf = null;
         for (let i = 0; i < carteles.length; i++) {
-          const canvas = await html2canvas(carteles[i], { scale: 3, useCORS: true, logging: false });
+          let canvas = await html2canvas(carteles[i], { scale: 3, useCORS: true, logging: false });
+          if (!isPro()) agregarMarcaAgua(canvas);
           const w = canvas.width;
           const h = canvas.height;
           if (i === 0) {
@@ -875,7 +965,8 @@
       } else {
         const mime = tipo === 'jpg' ? 'image/jpeg' : 'image/png';
         for (let i = 0; i < carteles.length; i++) {
-          const canvas = await html2canvas(carteles[i], { scale: 3, useCORS: true, logging: false });
+          let canvas = await html2canvas(carteles[i], { scale: 3, useCORS: true, logging: false });
+          if (!isPro()) agregarMarcaAgua(canvas);
           const a = document.createElement('a');
           a.download = `cartel-${i + 1}.${tipo}`;
           a.href = canvas.toDataURL(mime, 0.95);
@@ -954,6 +1045,10 @@
     if (!nombre) { alert('Escribí el nombre del producto primero.'); return; }
     const lista = getProductos();
     const existente = lista.findIndex(p => p.nombre === nombre);
+    if (!isPro() && existente < 0 && lista.length >= PRO_LIMIT) {
+      document.getElementById('btnAbrirModal').click();
+      return;
+    }
     const producto = {
       id: existente >= 0 ? lista[existente].id : Date.now().toString(),
       nombre,
@@ -977,12 +1072,105 @@
     setTimeout(() => { btn.textContent = '💾 Guardar en catálogo'; }, 1500);
   });
 
+  // ── Sistema Pro ──
+  const PRO_CODES = new Set([
+    'CART-A1B2-C3D4','CART-E5F6-G7H8','CART-I9J0-K1L2','CART-M3N4-O5P6',
+    'CART-Q7R8-S9T0','CART-U1V2-W3X4','CART-Y5Z6-A7B8','CART-C9D0-E1F2',
+    'CART-G3H4-I5J6','CART-K7L8-M9N0','CART-2P1Q-3R4S','CART-5T6U-7V8W',
+    'CART-0X1Y-2Z3A','CART-4B5C-6D7E','CART-8F9G-0H1I','CART-2J3K-4L5M',
+    'CART-6N7O-8P9Q','CART-0R1S-2T3U','CART-4V5W-6X7Y','CART-8Z9A-0B1C',
+    'CART-2D3E-4F5G','CART-6H7I-8J9K','CART-0L1M-2N3O','CART-4P5Q-6R7S',
+    'CART-8T9U-0V1W','CART-2X3Y-4Z5A','CART-6B7C-8D9E','CART-0F1G-2H3I',
+    'CART-4J5K-6L7M','CART-8N9O-0P1Q',
+  ]);
+  const PRO_LIMIT = 5;
+
+  const isPro = () => localStorage.getItem('cartelera_pro') === 'true';
+
+  function updateProUI() {
+    const pro = isPro();
+    document.getElementById('proBadge').classList.toggle('visible', pro);
+    document.getElementById('bannerFree').classList.toggle('hidden', pro);
+    document.getElementById('bannerPro').classList.toggle('visible', pro);
+  }
+
+  function agregarMarcaAgua(canvas) {
+    const ctx = canvas.getContext('2d');
+    const text = 'cartelera.app';
+    const size = Math.max(12, canvas.width * 0.045);
+    ctx.save();
+    ctx.font = `bold ${size}px sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(text, canvas.width - 10, canvas.height - 8);
+    ctx.restore();
+    return canvas;
+  }
+
+  // Abrir modal (el botón está en el panel, antes del script — funciona directo)
+  document.getElementById('btnAbrirModal').addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('codigoInput').value = '';
+    document.getElementById('modalError').style.display = 'none';
+    document.getElementById('codigoInput').classList.remove('error');
+    setTimeout(() => document.getElementById('codigoInput').focus(), 100);
+  });
+
   // Generar el primer cartel de muestra al cargar
+  // Los listeners del modal van aquí porque el modal HTML está después del script
   window.addEventListener('DOMContentLoaded', () => {
+    updateProUI();
     renderCatalogo();
     document.getElementById('btnAgregar').click();
+
+    // ── Listeners del modal (el HTML del modal está después del script) ──
+    document.getElementById('btnCerrarModal').addEventListener('click', () => {
+      document.getElementById('modalOverlay').classList.remove('open');
+    });
+    document.getElementById('modalOverlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('modalOverlay'))
+        document.getElementById('modalOverlay').classList.remove('open');
+    });
+    document.getElementById('codigoInput').addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      e.target.classList.remove('error');
+      document.getElementById('modalError').style.display = 'none';
+    });
+    document.getElementById('btnConfirmarCodigo').addEventListener('click', () => {
+      const code = document.getElementById('codigoInput').value.trim().toUpperCase();
+      if (PRO_CODES.has(code)) {
+        localStorage.setItem('cartelera_pro', 'true');
+        updateProUI();
+        document.getElementById('modalOverlay').classList.remove('open');
+        const banner = document.getElementById('bannerPro');
+        banner.style.background = '#c8f0d8';
+        setTimeout(() => { banner.style.background = ''; }, 1200);
+      } else {
+        document.getElementById('codigoInput').classList.add('error');
+        document.getElementById('modalError').style.display = 'block';
+      }
+    });
   });
 </script>
+
+<!-- ── Modal de activación Pro ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>⭐ Activar versión Pro</h2>
+    <p>Ingresá tu código de activación para desbloquear todas las funciones.</p>
+    <ul class="modal-features">
+      <li>Catálogo ilimitado de productos</li>
+      <li>Descargas sin marca de agua</li>
+      <li>Acceso a todas las funciones futuras</li>
+    </ul>
+    <input class="modal-input" id="codigoInput" type="text"
+      placeholder="CART-XXXX-XXXX" maxlength="14" autocomplete="off" />
+    <div class="modal-error" id="modalError">Código incorrecto. Verificá que esté bien escrito.</div>
+    <button class="btn-modal-activar" id="btnConfirmarCodigo">Activar ahora</button>
+    <button class="btn-modal-cerrar" id="btnCerrarModal">Cancelar</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
