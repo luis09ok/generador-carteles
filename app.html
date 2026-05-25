@@ -29,6 +29,17 @@
     }
     header h1 { font-size: 1.3rem; font-weight: 700; }
     header span { font-size: 1.6rem; }
+    .header-spacer { flex: 1; }
+    header a.nav-link { color: white; text-decoration: none; font-size: 0.88rem; opacity: 0.8; transition: opacity .15s; }
+    header a.nav-link:hover { opacity: 1; }
+    .nav-sep { opacity: 0.4; font-size: 0.9rem !important; }
+    .btn-nav-sm {
+      padding: 7px 16px; background: rgba(255,255,255,0.15); color: white;
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 20px;
+      font-size: 0.82rem; font-weight: 600; text-decoration: none;
+      transition: background .15s; white-space: nowrap;
+    }
+    .btn-nav-sm:hover { background: rgba(255,255,255,0.25); }
     .pro-badge {
       margin-left: 10px; background: #f4a261; color: #3d1a00;
       font-size: 0.65rem; font-weight: 900; padding: 3px 10px;
@@ -437,8 +448,12 @@
 
 <header>
   <span>🛒</span>
-  <h1>Generador de Carteles y Etiquetas</h1>
+  <a class="nav-link" href="index.html">Cartelera</a>
+  <span class="nav-sep">/</span>
+  <h1>Carteles y Etiquetas</h1>
   <span class="pro-badge" id="proBadge">⭐ PRO</span>
+  <span class="header-spacer"></span>
+  <a class="btn-nav-sm" href="oferta.html">🏷️ Afiche de Oferta →</a>
 </header>
 
 <div class="app">
@@ -448,7 +463,7 @@
 
     <!-- ── Banner Pro ── -->
     <div class="pro-banner free" id="bannerFree">
-      🔒 Versión gratis · 5 productos · Con marca de agua
+      <span id="bannerFreeText">🔒 Versión gratis · 1 descarga gratis · Con marca de agua</span>
       <button class="btn-activar" id="btnAbrirModal">Activar Pro →</button>
     </div>
     <div class="pro-banner activated" id="bannerPro">
@@ -938,6 +953,21 @@
 
   // ── Exportar PNG / JPG / PDF ──
   async function exportar(tipo) {
+    // Verificar registro
+    if (!localStorage.getItem('cartelera_registro')) {
+      document.getElementById('registroOverlay').classList.add('open');
+      setTimeout(() => document.getElementById('regNombre').focus(), 100);
+      return;
+    }
+    // Verificar límite de descarga para usuarios free
+    if (!isPro()) {
+      const usados = parseInt(localStorage.getItem('cartelera_descargas') || '0');
+      if (usados >= 1) {
+        document.getElementById('limiteOverlay').classList.add('open');
+        return;
+      }
+    }
+
     const carteles = [...document.querySelectorAll('.cartel')];
     if (!carteles.length) { alert('Primero agregá al menos un cartel.'); return; }
 
@@ -977,6 +1007,12 @@
     } finally {
       document.querySelectorAll('.cartel button').forEach(b => b.style.visibility = '');
       spinner.style.display = 'none';
+    }
+    // Registrar descarga para usuarios free
+    if (!isPro()) {
+      const usados = parseInt(localStorage.getItem('cartelera_descargas') || '0');
+      localStorage.setItem('cartelera_descargas', String(usados + 1));
+      updateProUI();
     }
   }
 
@@ -1092,6 +1128,15 @@
     document.getElementById('proBadge').classList.toggle('visible', pro);
     document.getElementById('bannerFree').classList.toggle('hidden', pro);
     document.getElementById('bannerPro').classList.toggle('visible', pro);
+    if (!pro) {
+      const usados = parseInt(localStorage.getItem('cartelera_descargas') || '0');
+      const restantes = Math.max(0, 1 - usados);
+      const txt = restantes > 0
+        ? `🔒 Versión gratis · ${restantes} descarga gratis · Con marca de agua`
+        : `🔒 Versión gratis · Sin descargas restantes`;
+      const el = document.getElementById('bannerFreeText');
+      if (el) el.textContent = txt;
+    }
   }
 
   function agregarMarcaAgua(canvas) {
@@ -1123,6 +1168,42 @@
     updateProUI();
     renderCatalogo();
     document.getElementById('btnAgregar').click();
+
+    // ── Registro: mostrar si no hay registro ──
+    if (!localStorage.getItem('cartelera_registro')) {
+      document.getElementById('registroOverlay').classList.add('open');
+    }
+    document.getElementById('btnRegistrar').addEventListener('click', () => {
+      const nombre = document.getElementById('regNombre').value.trim();
+      const email  = document.getElementById('regEmail').value.trim();
+      if (!nombre || !email) {
+        document.getElementById('regError').style.display = 'block';
+        return;
+      }
+      localStorage.setItem('cartelera_registro', JSON.stringify({ nombre, email, fecha: new Date().toISOString() }));
+      document.getElementById('registroOverlay').classList.remove('open');
+      updateProUI();
+    });
+    document.getElementById('regNombre').addEventListener('input', () => {
+      document.getElementById('regError').style.display = 'none';
+    });
+
+    // ── Límite de descarga ──
+    document.getElementById('btnCerrarLimite').addEventListener('click', () => {
+      document.getElementById('limiteOverlay').classList.remove('open');
+    });
+    document.getElementById('limiteOverlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('limiteOverlay'))
+        document.getElementById('limiteOverlay').classList.remove('open');
+    });
+    document.getElementById('btnYaCompre').addEventListener('click', () => {
+      document.getElementById('limiteOverlay').classList.remove('open');
+      document.getElementById('modalOverlay').classList.add('open');
+      document.getElementById('codigoInput').value = '';
+      document.getElementById('modalError').style.display = 'none';
+      document.getElementById('codigoInput').classList.remove('error');
+      setTimeout(() => document.getElementById('codigoInput').focus(), 100);
+    });
 
     // ── Listeners del modal (el HTML del modal está después del script) ──
     document.getElementById('btnCerrarModal').addEventListener('click', () => {
@@ -1169,6 +1250,49 @@
     <div class="modal-error" id="modalError">Código incorrecto. Verificá que esté bien escrito.</div>
     <button class="btn-modal-activar" id="btnConfirmarCodigo">Activar ahora</button>
     <button class="btn-modal-cerrar" id="btnCerrarModal">Cancelar</button>
+  </div>
+</div>
+
+<!-- ── Modal de Registro ── -->
+<div class="modal-overlay" id="registroOverlay">
+  <div class="modal">
+    <div style="font-size:2.5rem;text-align:center;margin-bottom:4px">🛒</div>
+    <h2>Bienvenido a Cartelera</h2>
+    <p>Registrate gratis para empezar a crear carteles en segundos.</p>
+    <div style="margin-top:14px">
+      <label style="display:block;font-size:0.8rem;font-weight:700;color:#444;margin-bottom:4px">Tu nombre</label>
+      <input class="modal-input" id="regNombre" type="text" placeholder="Ej: María López" maxlength="60" />
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:0.8rem;font-weight:700;color:#444;margin-bottom:4px">Tu email</label>
+      <input class="modal-input" id="regEmail" type="email" placeholder="tu@email.com" maxlength="80" />
+    </div>
+    <div class="modal-error" id="regError" style="display:none;margin-top:6px">Por favor completá nombre y email.</div>
+    <button class="btn-modal-activar" id="btnRegistrar" style="margin-top:16px">Crear cuenta gratis →</button>
+    <p style="font-size:0.72rem;color:#aaa;text-align:center;margin-top:10px">Tu información se guarda solo en este dispositivo.</p>
+  </div>
+</div>
+
+<!-- ── Modal Límite de Descarga ── -->
+<div class="modal-overlay" id="limiteOverlay">
+  <div class="modal">
+    <div style="font-size:2.5rem;text-align:center;margin-bottom:4px">🔒</div>
+    <h2>Descarga gratuita agotada</h2>
+    <p>Ya usaste tu descarga gratuita. Activá Pro para descargar sin límites y sin marca de agua.</p>
+    <ul class="modal-features" style="margin-top:12px">
+      <li>✅ Descargas ilimitadas (PNG, JPG, PDF)</li>
+      <li>✅ Sin marca de agua</li>
+      <li>✅ Catálogo ilimitado de productos</li>
+      <li>✅ Acceso al Afiche de Oferta sin límites</li>
+    </ul>
+    <a class="btn-modal-activar" href="https://mpago.la/2sS1ppY" target="_blank"
+       style="display:block;text-align:center;text-decoration:none;margin-top:16px;font-size:1rem">
+      💳 Obtener Pro — $199 ARS →
+    </a>
+    <p style="font-size:0.8rem;color:#666;text-align:center;margin-top:12px">
+      ¿Ya compraste? <button id="btnYaCompre" style="background:none;border:none;color:#2d6a4f;cursor:pointer;font-weight:700;font-size:0.8rem;padding:0;text-decoration:underline">Ingresar código →</button>
+    </p>
+    <button class="btn-modal-cerrar" id="btnCerrarLimite" style="margin-top:6px">Ahora no</button>
   </div>
 </div>
 
